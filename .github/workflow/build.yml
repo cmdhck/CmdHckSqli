@@ -1,0 +1,82 @@
+name: Build CmdHckSqli APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45  # Builds typically take 20-30 minutes
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git zip unzip \
+          openjdk-17-jdk \
+          python3-pip \
+          autoconf libtool \
+          pkg-config zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 cmake
+
+    - name: Install Python tools
+      run: |
+        pip install --upgrade pip
+        pip install buildozer cython
+
+    - name: Setup SQLMap
+      run: |
+        mkdir -p libs
+        git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git libs/sqlmap
+        rm -rf libs/sqlmap/.git libs/sqlmap/tests libs/sqlmap/doc
+
+    - name: Configure Buildozer
+      run: |
+        echo "[app]
+        title = CmdHckSqli
+        package.name = cmdhcksqli
+        package.domain = org.cmdhck
+        source.dir = .
+        source.include_exts = py,png,jpg,kv,ttf,json
+        source.include_patterns = libs/*
+        source.exclude_dirs = tests,bin,libs/sqlmap/tests,libs/sqlmap/doc
+        requirements = python3,kivy==2.2.1,kivymd==1.1.1,requests,pygments,chardet,urllib3
+        android.api = 33
+        android.minapi = 21
+        android.ndk_api = 21
+        android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE
+        android.strip = True" > buildozer.spec
+
+    - name: Build APK
+      run: |
+        buildozer -v android release
+        mv bin/*.apk CmdHckSqli.apk
+
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: CmdHckSqli-APK
+        path: CmdHckSqli.apk
+
+    - name: Upload build logs
+      if: ${{ always() }}  # Upload even if build fails
+      uses: actions/upload-artifact@v3
+      with:
+        name: Build-Logs
+        path: |
+          .buildozer/android/platform/build-armeabi-v7a/dists/cmdhcksqli/build/outputs/logs/*
+          .buildozer/android/platform/python-for-android/*.log
