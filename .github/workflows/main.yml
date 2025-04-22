@@ -2,17 +2,19 @@ name: Build CmdHckSqli APK
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-22.04
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - name: Set up Python
+    - name: Set up Python 3.9
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
@@ -21,57 +23,70 @@ jobs:
       run: |
         sudo apt-get update
         sudo apt-get install -y \
-          git \
-          zip \
-          unzip \
-          openjdk-17-jdk \
-          build-essential \
-          zlib1g-dev \
-          libffi-dev \
-          libssl-dev
+          git zip unzip openjdk-17-jdk \
+          build-essential zlib1g-dev \
+          libncurses5-dev libffi-dev \
+          libssl-dev python3-pip
 
-    - name: Install Buildozer
-      run: pip install buildozer cython
+    - name: Cache Android SDK
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.android
+          ~/android-sdk
+        key: ${{ runner.os }}-android-${{ hashFiles('buildozer.spec') }}
 
-    - name: Setup Android environment
+    - name: Set up Android SDK
+      if: steps.cache.outputs.cache-hit != 'true'
       run: |
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
         
-        # Download Android Command Line Tools
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-        unzip -qq commandlinetools-linux-9477386_latest.zip -d cmdline-tools
+        # Download latest command line tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+        unzip -qq cmdline-tools.zip -d cmdline-tools
         mkdir -p ~/android-sdk/cmdline-tools
         mv cmdline-tools/cmdline-tools ~/android-sdk/cmdline-tools/latest
         
-        # Setup environment variables
+        # Set environment variables
         echo "ANDROID_SDK_ROOT=$HOME/android-sdk" >> $GITHUB_ENV
         echo "$HOME/android-sdk/cmdline-tools/latest/bin:$PATH" >> $GITHUB_PATH
         
         # Accept licenses and install components
-        yes | ~/android-sdk/cmdline-tools/latest/bin/sdkmanager --licenses > /dev/null
-        ~/android-sdk/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-33" "build-tools;34.0.0"
+        yes | sdkmanager --licenses > /dev/null
+        sdkmanager "platform-tools" "platforms;android-33" "build-tools;34.0.0" "ndk;25.2.9519653"
+
+    - name: Install Python dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install buildozer cython virtualenv
 
     - name: Build APK
       run: |
-        # Generate buildozer.spec
-        cat > buildozer.spec <<EOL
-        [app]
-        title = CmdHckSqli
-        package.name = cmdhcksqli
-        requirements = python3,kivy==2.2.1,kivymd==1.1.1
-        android.api = 33
-        android.minapi = 21
-        android.sdk_path = $HOME/android-sdk
-        android.ndk_path = $HOME/android-ndk
-        android.accept_sdk_license = True
-        EOL
+        # Create buildozer.spec if missing
+        if [ ! -f buildozer.spec ]; then
+          buildozer init
+          sed -i 's/^requirements =.*/requirements = python3,kivy==2.2.1,kivymd==1.1.1,requests,pygments/' buildozer.spec
+          echo "android.api = 33" >> buildozer.spec
+          echo "android.minapi = 21" >> buildozer.spec
+          echo "android.sdk_path = $HOME/android-sdk" >> buildozer.spec
+          echo "android.ndk_path = $HOME/android-sdk/ndk/25.2.9519653" >> buildozer.spec
+        fi
         
-        # Run build
-        buildozer -v android debug
+        buildozer -v android release
 
     - name: Upload APK
       uses: actions/upload-artifact@v3
       with:
         name: CmdHckSqli-APK
         path: bin/*.apk
+        retention-days: 7
+
+    - name: Upload build logs
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: Build-Logs
+        path: |
+          .buildozer/**/*.log
+          buildozer.spec
