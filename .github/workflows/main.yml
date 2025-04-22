@@ -22,8 +22,9 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y \
           git zip unzip openjdk-17-jdk \
-          libncurses5 libncurses5-dev \
-          libtinfo5 cmake
+          libncurses6 libncurses-dev \  # Updated package names
+          libtinfo6 cmake \             # Updated package names
+          zlib1g-dev
 
     - name: Install Buildozer
       run: pip install buildozer cython
