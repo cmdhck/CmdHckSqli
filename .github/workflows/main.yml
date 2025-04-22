@@ -1,6 +1,6 @@
 name: Build CmdHckSqli APK
 
-on: 
+on:
   push:
     branches: [main]
 
@@ -8,22 +8,28 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.9'
-        
+
     - name: Install dependencies
       run: |
         sudo apt-get update
         sudo apt-get install -y git zip unzip openjdk-17-jdk
         pip install buildozer cython
-        
+
+    - name: Accept Android Licenses
+      run: |
+        mkdir -p ~/.android
+        touch ~/.android/repositories.cfg
+        yes | sdkmanager --licenses
+
     - name: Build APK
       run: |
-        # Skip buildozer init since spec file exists
+        # Skip buildozer init if spec exists
         buildozer -v android debug
