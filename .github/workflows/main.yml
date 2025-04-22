@@ -25,10 +25,5 @@ jobs:
         
     - name: Build APK
       run: |
-        buildozer init
-        echo "[app]
-        title = CmdHckSqli
-        package.name = cmdhcksqli
-        requirements = python3,kivy==2.2.1,kivymd==1.1.1
-        android.permissions = INTERNET" > buildozer.spec
+        # Skip buildozer init since spec file exists
         buildozer -v android debug
