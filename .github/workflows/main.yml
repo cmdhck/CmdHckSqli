@@ -6,7 +6,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04  # Explicitly specify Ubuntu version
     timeout-minutes: 30
 
     steps:
@@ -17,30 +17,52 @@ jobs:
       with:
         python-version: '3.9'
 
-    - name: Install system dependencies
+    - name: Install essential dependencies
       run: |
-        sudo apt-get update
+        sudo apt-get update -y
         sudo apt-get install -y \
-          git zip unzip openjdk-17-jdk \
-          libncurses6 libncurses-dev \  # Updated package names
-          libtinfo6 cmake \             # Updated package names
-          zlib1g-dev
+          git \
+          zip \
+          unzip \
+          openjdk-17-jdk \
+          build-essential \
+          zlib1g-dev \
+          libffi-dev \
+          libssl-dev
 
     - name: Install Buildozer
       run: pip install buildozer cython
 
-    - name: Configure Android SDK
+    - name: Setup Android SDK
       run: |
         mkdir -p ~/.android
         touch ~/.android/repositories.cfg
-        wget https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-        unzip cmdline-tools.zip -d cmdline-tools
-        mv cmdline-tools/cmdline-tools ~/android-sdk
+        
+        # Download and setup command line tools
+        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
+        unzip -qq cmdline-tools.zip -d cmdline-tools
+        mkdir -p ~/android-sdk/cmdline-tools
+        mv cmdline-tools/cmdline-tools ~/android-sdk/cmdline-tools/latest
         export ANDROID_SDK_ROOT=~/android-sdk
-        export PATH=$PATH:$ANDROID_SDK_ROOT/bin
-        yes | sdkmanager --licenses
+        export PATH=$PATH:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin
+        
+        # Accept licenses and install components
+        yes | sdkmanager --licenses > /dev/null
         sdkmanager "platform-tools" "platforms;android-33" "build-tools;34.0.0"
 
     - name: Build APK
       run: |
+        echo "[app]
+        title = CmdHckSqli
+        package.name = cmdhcksqli
+        requirements = python3,kivy==2.2.1,kivymd==1.1.1
+        android.api = 33
+        android.minapi = 21
+        android.sdk_path = $HOME/android-sdk
+        android.ndk_path = $HOME/android-ndk
+        android.accept_sdk_license = True" > buildozer.spec
+        
         buildozer -v android debug
+
+    - name: Upload APK
+      us
