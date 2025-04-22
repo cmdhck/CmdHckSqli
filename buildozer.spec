@@ -75,8 +75,8 @@ osx.kivy_version = 1.9.1
 android.minapi = 21
 android.ndk = 23b
 android.sdk = 
-android.ndk_api = 21
-android.sdk_path = 
+android.sdk_path = /home/runner/android-sdk
+android.ndk_path = /home/runner/android-ndk
 android.arch = arm64-v8a
 
 # (bool) Indicate if the application should be fullscreen or not
